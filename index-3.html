@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Commute Tracker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#5b3df5">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bus: #ff7a45;
+    --home: #12b886;
+    --college: #5b3df5;
+    --bg1: #f4f1fd;
+    --bg2: #e9e4fb;
+    --ink: #1c1730;
+    --muted: #8b87a3;
+    --card: #ffffff;
+    --shadow: 0 10px 30px rgba(60, 40, 140, 0.10);
+    --shadow-sm: 0 3px 10px rgba(60, 40, 140, 0.07);
+    --grad-primary: linear-gradient(135deg, #5b3df5, #8f6bff);
+    --grad-bus: linear-gradient(135deg, #ff7a45, #ffab6e);
+    --grad-home: linear-gradient(135deg, #12b886, #3fd8a8);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    background: radial-gradient(circle at 20% 0%, var(--bg2), var(--bg1) 60%);
+    color: var(--ink);
+    padding-bottom: 88px;
+    overflow-x: hidden;
+  }
+  .container { max-width: 480px; margin: 0 auto; padding: 20px 16px 10px; }
+
+  /* ============ ONBOARDING ============ */
+  #onboarding {
+    position: fixed; inset: 0; z-index: 100;
+    background: var(--grad-primary);
+    display: flex; flex-direction: column;
+    color: #fff;
+    overflow: hidden;
+  }
+  .ob-track {
+    display: flex; height: 100%;
+    transition: transform 0.45s cubic-bezier(.65,0,.35,1);
+  }
+  .ob-slide {
+    min-width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 40px 28px; text-align: center;
+  }
+  .ob-blob {
+    width: 140px; height: 140px; border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 60px; margin-bottom: 28px;
+    animation: floatY 3.5s ease-in-out infinite;
+    backdrop-filter: blur(6px);
+  }
+  @keyframes floatY { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-10px);} }
+  .ob-title { font-family: 'Poppins', sans-serif; font-size: 25px; font-weight: 800; margin-bottom: 10px; }
+  .ob-text { font-size: 14.5px; line-height: 1.6; opacity: 0.92; max-width: 320px; }
+  .ob-feature-row { display: flex; gap: 14px; margin: 26px 0 6px; flex-wrap: wrap; justify-content: center; }
+  .ob-feature { background: rgba(255,255,255,0.14); border-radius: 16px; padding: 16px 14px; width: 96px; }
+  .ob-feature .fi { font-size: 24px; margin-bottom: 6px; }
+  .ob-feature .fl { font-size: 11px; font-weight: 600; }
+
+  .ob-loc-status {
+    margin-top: 24px; width: 100%; max-width: 320px;
+    background: rgba(255,255,255,0.14); border-radius: 16px; padding: 18px; backdrop-filter: blur(6px);
+  }
+  .ob-loc-status .row { display:flex; align-items:center; justify-content:center; gap: 10px; font-size: 14px; font-weight: 600; }
+  .ob-spinner {
+    width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.4); border-top-color: #fff;
+    animation: spin 0.8s linear infinite; display: none;
+  }
+  .ob-spinner.show { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ob-check { font-size: 18px; display: none; }
+  .ob-check.show { display: inline-block; animation: popIn 0.35s ease; }
+  @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+  .ob-loc-hint { font-size: 12px; opacity: 0.85; margin-top: 8px; }
+
+  .ob-btn {
+    margin-top: 30px; padding: 14px 38px; border-radius: 30px; border: none;
+    background: #fff; color: var(--college); font-weight: 700; font-size: 15px; cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15); transition: transform 0.15s ease;
+  }
+  .ob-btn:active { transform: scale(0.96); }
+  .ob-btn.secondary { background: rgba(255,255,255,0.16); color: #fff; box-shadow: none; margin-top: 12px; padding: 10px 26px; font-size: 13px; }
+  .ob-btn:disabled { opacity: 0.5; }
+
+  .ob-dots { display: flex; gap: 7px; justify-content: center; padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+  .ob-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.35); transition: all 0.3s ease; }
+  .ob-dot.active { background: #fff; width: 20px; border-radius: 4px; }
+
+  /* ============ TOP BAR ============ */
+  .topbar {
+    position: sticky; top: 0; z-index: 5;
+    background: rgba(244,241,253,0.85);
+    backdrop-filter: blur(10px);
+    padding: 16px 16px 10px;
+    text-align: center;
+  }
+  .topbar h1 { font-family: 'Poppins', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -0.3px; background: var(--grad-primary); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .topbar .subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; font-weight: 500; }
+
+  .page { display: none; animation: fadeIn 0.35s ease; }
+  .page.active { display: block; }
+
+  .card {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+    border: 1px solid rgba(91,61,245,0.05);
+  }
+
+  /* ---------- TRACK PAGE ---------- */
+  .status-card { text-align: center; background: var(--grad-primary); color: #fff; position: relative; overflow: hidden; }
+  .status-card::after {
+    content: ''; position: absolute; width: 200px; height: 200px; border-radius: 50%;
+    background: rgba(255,255,255,0.08); top: -100px; right: -60px;
+  }
+  .status-label { font-size: 12px; color: rgba(255,255,255,0.75); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; position: relative; }
+  .status-value { font-family: 'Poppins', sans-serif; font-size: 27px; font-weight: 800; margin-top: 6px; position: relative; }
+  .status-timer { font-size: 15px; color: rgba(255,255,255,0.85); margin-top: 8px; font-variant-numeric: tabular-nums; font-weight: 500; position: relative; }
+  .pulse-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #baffd9; margin-right: 6px; animation: pulse 1.4s infinite; vertical-align: middle; }
+
+  .buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  button.state-btn {
+    padding: 18px 6px; border: none; border-radius: 16px; font-size: 14px; font-weight: 600;
+    font-family: 'Inter', sans-serif; color: #fff; cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.2s; box-shadow: 0 6px 16px rgba(0,0,0,0.10);
+  }
+  button.state-btn span.emoji { display:block; font-size: 22px; margin-bottom: 4px; }
+  button.state-btn:active { transform: scale(0.94); }
+  button.state-btn:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
+  #btn-bus { background: var(--grad-bus); }
+  #btn-home { background: var(--grad-home); }
+  #btn-college { background: var(--grad-primary); }
+
+  .summary-title { font-family: 'Poppins', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+  .summary-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid #f3f1fb; }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-name { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 500; }
+  .summary-time { font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot-bus { background: var(--bus); } .dot-home { background: var(--home); } .dot-college { background: var(--college); }
+
+  .history-item { display: flex; justify-content: space-between; font-size: 13px; padding: 9px 0; border-bottom: 1px solid #f5f4fb; color: #4a4560; }
+  .history-item:last-child { border-bottom: none; }
+  .history-empty { font-size: 13px; color: var(--muted); text-align: center; padding: 12px 0; }
+  .reset-btn { display: block; margin: 18px auto 0; background: none; border: none; color: #e8425a; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+  /* ---------- SPEEDOMETER ---------- */
+  .speedo-card { text-align: center; animation: fadeIn 0.4s ease; }
+  .speedo-card .summary-title { display:flex; align-items:center; justify-content: space-between; }
+  .gps-status { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
+  .gps-status.on { background: rgba(18,184,134,0.12); color: var(--home); }
+  .gps-status.off { background: rgba(232,66,90,0.1); color: #e8425a; }
+  .gauge-wrap { position: relative; width: 220px; height: 130px; margin: 6px auto 0; }
+  .gauge-readout { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; }
+  .gauge-speed { font-family: 'Poppins', sans-serif; font-size: 34px; font-weight: 800; color: var(--ink); }
+  .gauge-unit { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: -2px; }
+  .speedo-stats { display: flex; justify-content: space-around; margin-top: 14px; }
+  .speedo-stat { text-align: center; }
+  .speedo-stat .v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .speedo-stat .l { font-size: 11px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+  .gps-btn { margin-top: 14px; width: 100%; padding: 11px 0; border: none; border-radius: 12px; background: var(--grad-primary); color: #fff; font-weight: 600; font-size: 13.5px; cursor: pointer; }
+  .gps-hint { font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+
+  /* ---------- AUTO-DETECT ---------- */
+  .auto-card .summary-title { display:flex; align-items:center; justify-content: space-between; }
+  .toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: #e2ddf5; border-radius: 24px; transition: 0.25s; }
+  .toggle-slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.25s; }
+  .toggle-switch input:checked + .toggle-slider { background: var(--college); }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+  .auto-loc-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f1fb; }
+  .auto-loc-row:last-of-type { border-bottom: none; }
+  .auto-loc-name { font-size: 13.5px; font-weight: 500; }
+  .auto-loc-status { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .auto-loc-status.set { color: var(--home); }
+  .set-loc-btn { padding: 7px 12px; border: none; border-radius: 8px; background: #f1eefb; color: var(--ink); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .auto-status-banner { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; text-align: center; }
+  .auto-status-banner.active { background: rgba(91,61,245,0.1); color: var(--college); }
+  .auto-status-banner.inactive { background: #f1eefb; color: var(--muted); }
+
+  /* ---------- STATS PAGE ---------- */
+  .tabs { display: flex; background: #f1eefb; border-radius: 12px; padding: 4px; margin-bottom: 16px; }
+  .tab { flex: 1; text-align: center; padding: 8px 0; font-size: 13px; font-weight: 600; color: var(--muted); border-radius: 9px; cursor: pointer; transition: all 0.25s ease; }
+  .tab.active { background: #fff; color: var(--ink); box-shadow: var(--shadow-sm); }
+  .chart-wrap { position: relative; height: 220px; margin: 4px 0 16px; }
+  .legend { display: flex; justify-content: center; gap: 18px; margin-bottom: 4px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+
+  /* ---------- LEARN PAGE ---------- */
+  .learn-hero { background: var(--grad-primary); border-radius: 20px; padding: 18px 20px; color: #fff; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 12px 26px rgba(91,61,245,0.28); }
+  .learn-hero .txt .t1 { font-family:'Poppins',sans-serif; font-weight: 700; font-size: 15px; }
+  .learn-hero .txt .t2 { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+  .learn-hero .ring { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
+  .learn-hero .ring svg { transform: rotate(-90deg); }
+  .learn-hero .ring .pct { position: absolute; inset: 0; display:flex; align-items:center; justify-content:center; font-size: 12px; font-weight: 700; }
+
+  .cat-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; scrollbar-width: none; }
+  .cat-chips::-webkit-scrollbar { display: none; }
+  .chip { flex-shrink: 0; padding: 8px 14px; border-radius: 20px; background: #fff; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; box-shadow: var(--shadow-sm); white-space: nowrap; transition: all 0.2s ease; }
+  .chip.active { background: var(--ink); color: #fff; }
+
+  .topic-card { background: #fff; border-radius: 18px; padding: 16px 18px; margin-bottom: 12px; box-shadow: var(--shadow-sm); cursor: pointer; transition: box-shadow 0.2s ease; }
+  .topic-card.open { box-shadow: var(--shadow); }
+  .topic-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .topic-title-wrap { display: flex; align-items: center; gap: 10px; }
+  .topic-check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #e2ddf5; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; transition: all 0.2s ease; }
+  .topic-check.done { background: var(--home); border-color: var(--home); }
+  .topic-title { font-size: 14px; font-weight: 600; }
+  .topic-cat-label { font-size: 10.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  .chevron { font-size: 12px; color: var(--muted); transition: transform 0.25s ease; }
+  .topic-card.open .chevron { transform: rotate(180deg); }
+  .topic-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+  .topic-card.open .topic-body { max-height: 600px; }
+  .topic-body-inner { padding-top: 12px; }
+  .topic-explain { font-size: 13.5px; line-height: 1.55; color: #4a4560; margin-bottom: 10px; }
+  .topic-code { background: #1c1730; color: #d8d0ff; font-family: 'Fira Code', monospace; font-size: 12.5px; padding: 12px 14px; border-radius: 12px; overflow-x: auto; white-space: pre; line-height: 1.5; }
+  .topic-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .mark-btn, .listen-btn { padding: 9px 0; border: none; border-radius: 10px; font-weight: 600; font-size: 12.5px; cursor: pointer; flex: 1; }
+  .mark-btn { background: #f1eefb; color: var(--ink); }
+  .mark-btn.done { background: rgba(18,184,134,0.12); color: var(--home); }
+  .listen-btn { background: rgba(91,61,245,0.1); color: var(--college); }
+  .listen-btn.speaking { background: var(--grad-primary); color: #fff; }
+
+  /* ---------- BOTTOM NAV ---------- */
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; box-shadow: 0 -6px 22px rgba(60,40,140,0.08); display: flex; justify-content: space-around; padding: 10px 0 max(10px, env(safe-area-inset-bottom)); z-index: 10; }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--muted); cursor: pointer; font-size: 10.5px; font-weight: 600; width: 80px; }
+  .nav-item .ic { font-size: 20px; transition: transform 0.15s ease; }
+  .nav-item.active { color: var(--college); }
+  .nav-item.active .ic { transform: translateY(-2px); }
+
+  #toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 14px; font-size: 13px; box-shadow: 0 10px 24px rgba(0,0,0,0.25); opacity: 0; pointer-events: none; transition: all 0.35s ease; z-index: 20; display: flex; align-items: center; gap: 10px; max-width: 90%; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast button { background: var(--college); color: #fff; border: none; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(186,255,217,0.6);} 70% { box-shadow: 0 0 0 7px rgba(186,255,217,0);} 100% { box-shadow: 0 0 0 0 rgba(186,255,217,0);} }
+</style>
+</head>
+<body>
+
+<!-- ============ ONBOARDING ============ -->
+<div id="onboarding">
+  <div class="ob-track" id="ob-track">
+    <div class="ob-slide">
+      <div class="ob-blob">🚌</div>
+      <div class="ob-title">Commute Tracker</div>
+      <div class="ob-text">Track your day, learn on the bus, and never lose time to guesswork again.</div>
+      <button class="ob-btn" onclick="obNext()">Get Started</button>
+    </div>
+
+    <div class="ob-slide">
+      <div class="ob-title">What you get</div>
+      <div class="ob-feature-row">
+        <div class="ob-feature"><div class="fi">⏱️</div><div class="fl">Auto Tracking</div></div>
+        <div class="ob-feature"><div class="fi">📚</div><div class="fl">Bus-time Coding</div></div>
+        <div class="ob-feature"><div class="fi">🚀</div><div class="fl">Live Speed</div></div>
+        <div class="ob-feature"><div class="fi">📊</div><div class="fl">Weekly Stats</div></div>
+      </div>
+      <div class="ob-text" style="margin-top:18px;">Next, let's set your two key spots so the app can auto-detect where you are.</div>
+      <button class="ob-btn" onclick="obNext()">Continue</button>
+    </div>
+
+    <div class="ob-slide">
+      <div class="ob-blob">🏠</div>
+      <div class="ob-title">Set Your Home</div>
+      <div class="ob-text">Stand at home right now, then tap below. This lets the app auto-detect when you've arrived home.</div>
+      <div class="ob-loc-status">
+        <div class="row">
+          <span class="ob-spinner" id="ob-home-spinner"></span>
+          <span id="ob-home-text">Not set yet</span>
+          <span class="ob-check" id="ob-home-check">✅</span>
+        </div>
+        <div class="ob-loc-hint">Needs location permission — allow it when asked.</div>
+      </div>
+      <button class="ob-btn" onclick="obSaveLocation('home')">Save This as Home</button>
+      <button class="ob-btn secondary" onclick="obNext()" id="ob-home-next">Skip for now</button>
+    </div>
+
+    <div class="ob-slide">
+      <div class="ob-blob">🎓</div>
+      <div class="ob-title">Set Your College</div>
+      <div class="ob-text">Now do the same at college (or just tap Skip and set it later from Settings).</div>
+      <div class="ob-loc-status">
+        <div class="row">
+          <span class="ob-spinner" id="ob-college-spinner"></span>
+          <span id="ob-college-text">Not set yet</span>
+          <span class="ob-check" id="ob-college-check">✅</span>
+        </div>
+        <div class="ob-loc-hint">Needs location permission — allow it when asked.</div>
+      </div>
+      <button class="ob-btn" onclick="obSaveLocation('college')">Save This as College</button>
+      <button class="ob-btn secondary" onclick="obFinish()" id="ob-college-next">Skip for now</button>
+    </div>
+
+    <div class="ob-slide">
+      <div class="ob-blob">🎉</div>
+      <div class="ob-title">You're all set!</div>
+      <div class="ob-text" id="ob-summary-text">Your locations are saved. The app will auto-detect Bus, Home, and College as you move.</div>
+      <button class="ob-btn" onclick="obFinish()">Start Using the App</button>
+    </div>
+  </div>
+  <div class="ob-dots" id="ob-dots"></div>
+</div>
+
+<div class="topbar">
+  <h1 id="page-title">Commute Tracker</h1>
+  <div class="subtitle" id="page-subtitle">Bus · Home · College</div>
+</div>
+
+<div class="container">
+
+  <!-- TRACK PAGE -->
+  <div class="page active" id="page-track">
+    <div class="card status-card">
+      <div class="status-label">Currently in</div>
+      <div class="status-value" id="current-state">Not started</div>
+      <div class="status-timer" id="current-timer">Tap a button below to start</div>
+    </div>
+
+    <div class="buttons">
+      <button class="state-btn" id="btn-bus" onclick="setState('bus')"><span class="emoji">🚌</span>Bus</button>
+      <button class="state-btn" id="btn-home" onclick="setState('home')"><span class="emoji">🏠</span>Home</button>
+      <button class="state-btn" id="btn-college" onclick="setState('college')"><span class="emoji">🎓</span>College</button>
+    </div>
+
+    <div class="card auto-card">
+      <div class="summary-title">
+        <span>Auto-Detect Location</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="auto-toggle" onchange="toggleAutoDetect(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="auto-loc-row">
+        <div><div class="auto-loc-name">🏠 Home</div><div class="auto-loc-status" id="home-loc-status">Not set</div></div>
+        <button class="set-loc-btn" onclick="saveAutoLocation('home')">Set as Home</button>
+      </div>
+      <div class="auto-loc-row">
+        <div><div class="auto-loc-name">🎓 College</div><div class="auto-loc-status" id="college-loc-status">Not set</div></div>
+        <button class="set-loc-btn" onclick="saveAutoLocation('college')">Set as College</button>
+      </div>
+      <div class="auto-status-banner inactive" id="auto-status-banner">Auto-detect is off — keep this app open in your browser while traveling for it to work.</div>
+    </div>
+
+    <div class="card speedo-card" id="speedo-card" style="display:none;">
+      <div class="summary-title"><span>Speedometer</span><span class="gps-status off" id="gps-status">GPS off</span></div>
+      <div class="gauge-wrap">
+        <svg width="220" height="130" viewBox="0 0 220 130">
+          <path d="M 15 115 A 95 95 0 0 1 205 115" fill="none" stroke="#f0edfa" stroke-width="14" stroke-linecap="round"/>
+          <path id="gauge-arc" d="M 15 115 A 95 95 0 0 1 205 115" fill="none" stroke="#5b3df5" stroke-width="14" stroke-linecap="round" stroke-dasharray="298" stroke-dashoffset="298"/>
+          <line id="gauge-needle" x1="110" y1="115" x2="110" y2="35" stroke="#1c1730" stroke-width="4" stroke-linecap="round" transform="rotate(-90 110 115)"/>
+          <circle cx="110" cy="115" r="7" fill="#1c1730"/>
+        </svg>
+        <div class="gauge-readout"><div class="gauge-speed" id="gauge-speed">0</div><div class="gauge-unit">km/h</div></div>
+      </div>
+      <div class="speedo-stats">
+        <div class="speedo-stat"><div class="v" id="speedo-avg">0</div><div class="l">avg km/h</div></div>
+        <div class="speedo-stat"><div class="v" id="speedo-max">0</div><div class="l">max km/h</div></div>
+        <div class="speedo-stat"><div class="v" id="speedo-dist">0.0</div><div class="l">km this ride</div></div>
+      </div>
+      <button class="gps-btn" id="gps-toggle-btn" onclick="toggleGPS()">Enable GPS Speed</button>
+      <div class="gps-hint">Works best opened directly on your phone with location allowed.</div>
+    </div>
+
+    <div class="card">
+      <div class="summary-title">Today's Totals</div>
+      <div class="summary-row"><div class="summary-name"><span class="dot dot-bus"></span>Bus</div><div class="summary-time" id="sum-bus">0h 0m</div></div>
+      <div class="summary-row"><div class="summary-name"><span class="dot dot-home"></span>Home</div><div class="summary-time" id="sum-home">0h 0m</div></div>
+      <div class="summary-row"><div class="summary-name"><span class="dot dot-college"></span>College</div><div class="summary-time" id="sum-college">0h 0m</div></div>
+    </div>
+
+    <div class="card">
+      <div class="summary-title">Today's Log</div>
+      <div id="history-list"><div class="history-empty">No entries yet today</div></div>
+    </div>
+    <button class="reset-btn" onclick="resetToday()">Reset today's data</button>
+  </div>
+
+  <!-- LEARN PAGE -->
+  <div class="page" id="page-learn">
+    <div class="learn-hero">
+      <div class="txt"><div class="t1">Bus-time Learning</div><div class="t2" id="learn-progress-text">0 of 0 topics learned</div></div>
+      <div class="ring">
+        <svg width="52" height="52">
+          <circle cx="26" cy="26" r="22" stroke="rgba(255,255,255,0.3)" stroke-width="5" fill="none"/>
+          <circle id="ring-progress" cx="26" cy="26" r="22" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="138" stroke-dashoffset="138"/>
+        </svg>
+        <div class="pct" id="ring-pct">0%</div>
+      </div>
+    </div>
+    <div class="cat-chips" id="cat-chips"></div>
+    <div id="topics-list"></div>
+  </div>
+
+  <!-- STATS PAGE -->
+  <div class="page" id="page-stats">
+    <div class="card">
+      <div class="summary-title">Time Breakdown</div>
+      <div class="tabs">
+        <div class="tab active" id="tab-today" onclick="switchChartView('today')">Today</div>
+        <div class="tab" id="tab-week" onclick="switchChartView('week')">This Week</div>
+      </div>
+      <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+      <div class="legend">
+        <div class="legend-item"><span class="dot dot-bus"></span>Bus</div>
+        <div class="legend-item"><span class="dot dot-home"></span>Home</div>
+        <div class="legend-item"><span class="dot dot-college"></span>College</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"><span id="toast-text"></span></div>
+
+<div class="bottom-nav">
+  <div class="nav-item active" id="nav-track" onclick="switchPage('track')"><span class="ic">🏠</span>Track</div>
+  <div class="nav-item" id="nav-learn" onclick="switchPage('learn')"><span class="ic">📚</span>Learn</div>
+  <div class="nav-item" id="nav-stats" onclick="switchPage('stats')"><span class="ic">📊</span>Stats</div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'ct2_data_v1';
+  const LEARN_KEY = 'ct2_learn_v1';
+  const AUTO_KEY = 'ct2_auto_v1';
+  const ONBOARD_KEY = 'ct2_onboarded_v1';
+
+  let data = loadData();
+  let learnState = loadLearn();
+  let autoData = loadAuto();
+  let currentChartView = 'today';
+  let currentCategory = 'All';
+  let chart = null;
+  let currentPage = 'track';
+  let speechUtterance = null;
+
+  /* ================= ONBOARDING ================= */
+  let obIndex = 0;
+  const OB_SLIDES = 6;
+  let obHomeSaved = false, obCollegeSaved = false;
+
+  function renderObDots() {
+    const wrap = document.getElementById('ob-dots');
+    wrap.innerHTML = '';
+    for (let i = 0; i < OB_SLIDES; i++) {
+      const d = document.createElement('div');
+      d.className = 'ob-dot' + (i === obIndex ? ' active' : '');
+      wrap.appendChild(d);
+    }
+  }
+  function obGoTo(i) {
+    obIndex = i;
+    document.getElementById('ob-track').style.transform = `translateX(-${i * 100}%)`;
+    renderObDots();
+  }
+  function obNext() { obGoTo(Math.min(obIndex + 1, OB_SLIDES - 1)); }
+
+  function obSaveLocation(which) {
+    if (!('geolocation' in navigator)) { alert("Location isn't available on this browser."); return; }
+    const spinner = document.getElementById('ob-' + which + '-spinner');
+    const text = document.getElementById('ob-' + which + '-text');
+    const check = document.getElementById('ob-' + which + '-check');
+    const nextBtn = document.getElementById('ob-' + which + '-next');
+    spinner.classList.add('show');
+    text.textContent = 'Getting your location…';
+    check.classList.remove('show');
+    navigator.geolocation.getCurrentPosition((pos) => {
+      autoData[which] = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      saveAuto();
+      spinner.classList.remove('show');
+      check.classList.add('show');
+      text.textContent = 'Saved!';
+      nextBtn.textContent = 'Continue';
+      if (which === 'home') obHomeSaved = true; else obCollegeSaved = true;
+      setTimeout(() => { if (which === 'home') obNext(); else obGoTo(5); }, 700);
+    }, () => {
+      spinner.classList.remove('show');
+      text.textContent = 'Could not get location — allow permission and retry.';
+    }, { enableHighAccuracy: true, timeout: 12000 });
+  }
+
+  function obFinish() {
+    localStorage.setItem(ONBOARD_KEY, '1');
+    if (autoData.home && autoData.college) {
+      autoData.enabled = true;
+      saveAuto();
+    }
+    document.getElementById('onboarding').style.display = 'none';
+    renderAutoUI();
+    if (autoData.enabled) startAutoWatch();
+  }
+
+  function initOnboarding() {
+    const done = localStorage.getItem(ONBOARD_KEY);
+    if (done) {
+      document.getElementById('onboarding').style.display = 'none';
+      return;
+    }
+    document.getElementById('onboarding').style.display = 'flex';
+    renderObDots();
+  }
+
+  /* ================= LEARN TOPICS ================= */
+  const topics = [
+    { id: 'p1', cat: 'Programming Basics', title: 'Variables & Data Types', explain: 'A variable is a named container that stores a value. Every value has a type — like a number, text, or true/false — which decides what you can do with it.', code: 'int age = 19;\nfloat price = 49.99;\nchar grade = \'A\';\nbool isPresent = true;' },
+    { id: 'p2', cat: 'Programming Basics', title: 'If / Else Conditions', explain: 'Conditions let your program make decisions. The code inside "if" runs only when the condition is true; otherwise the "else" block runs.', code: 'if (marks >= 50) {\n  printf("Pass");\n} else {\n  printf("Fail");\n}' },
+    { id: 'p3', cat: 'Programming Basics', title: 'Loops', explain: 'Loops repeat a block of code. "for" is used when you know how many times to repeat; "while" is used when you repeat until a condition becomes false.', code: 'for (int i = 1; i <= 5; i++) {\n  printf("%d\\n", i);\n}' },
+    { id: 'p4', cat: 'Programming Basics', title: 'Functions', explain: 'A function is a reusable block of code that performs one task. You call it by name whenever you need that task done, instead of repeating code.', code: 'int add(int a, int b) {\n  return a + b;\n}\n\nint result = add(4, 5); // 9' },
+    { id: 'c1', cat: 'C Programming', title: 'Arrays', explain: 'An array stores multiple values of the same type under one variable name, accessed using an index starting from 0.', code: 'int marks[5] = {90, 85, 76, 60, 99};\nprintf("%d", marks[0]); // 90' },
+    { id: 'c2', cat: 'C Programming', title: 'Pointers (the basics)', explain: 'A pointer is a variable that stores the memory address of another variable. The & operator gets an address, and * accesses the value stored there.', code: 'int x = 10;\nint *p = &x;\nprintf("%d", *p); // 10' },
+    { id: 'c3', cat: 'C Programming', title: 'Structures', explain: 'A structure groups different types of variables under one name, useful for representing a real-world object like a student record.', code: 'struct Student {\n  char name[20];\n  int age;\n};\nstruct Student s1 = {"Arun", 19};' },
+    { id: 'py1', cat: 'Python Basics', title: 'Lists', explain: 'A list in Python holds an ordered collection of items, and unlike arrays in C, it can grow, shrink, and hold mixed types.', code: 'fruits = ["apple", "banana", "mango"]\nfruits.append("grape")\nprint(fruits[1])  # banana' },
+    { id: 'py2', cat: 'Python Basics', title: 'Dictionaries', explain: 'A dictionary stores data as key-value pairs, letting you look up a value instantly using its key instead of a numeric index.', code: 'student = {"name": "Arun", "age": 19}\nprint(student["name"])  # Arun' },
+    { id: 'py3', cat: 'Python Basics', title: 'List Comprehension', explain: 'A short, readable way to build a list by transforming or filtering another list in a single line.', code: 'squares = [x*x for x in range(1, 6)]\n# [1, 4, 9, 16, 25]' },
+    { id: 'oop1', cat: 'OOP Concepts', title: 'Classes & Objects', explain: 'A class is a blueprint for creating objects. An object is one actual instance built from that blueprint, with its own data.', code: 'class Car:\n    def __init__(self, brand):\n        self.brand = brand\n\nmy_car = Car("Honda")' },
+    { id: 'oop2', cat: 'OOP Concepts', title: 'Inheritance', explain: 'Inheritance lets one class reuse the properties and methods of another, so you do not have to rewrite common code.', code: 'class Animal:\n    def speak(self):\n        print("Some sound")\n\nclass Dog(Animal):\n    pass\n\nDog().speak()  # Some sound' },
+    { id: 'oop3', cat: 'OOP Concepts', title: 'Encapsulation', explain: 'Encapsulation means keeping an object\'s internal data private and only exposing it through controlled methods, protecting it from accidental misuse.', code: 'class Account:\n    def __init__(self):\n        self.__balance = 0  # private\n\n    def deposit(self, amt):\n        self.__balance += amt' },
+    { id: 'oop4', cat: 'OOP Concepts', title: 'Polymorphism', explain: 'Polymorphism means the same method name can behave differently depending on which object calls it.', code: 'class Cat:\n    def sound(self): print("Meow")\nclass Cow:\n    def sound(self): print("Moo")\n\nfor a in [Cat(), Cow()]:\n    a.sound()' },
+    { id: 'ds1', cat: 'Data Structures', title: 'Stack (LIFO)', explain: 'A stack adds and removes items from the same end — Last In, First Out. Think of a stack of plates: you take from the top.', code: 'stack = []\nstack.append(1)\nstack.append(2)\nstack.pop()  # removes 2' },
+    { id: 'ds2', cat: 'Data Structures', title: 'Queue (FIFO)', explain: 'A queue adds items at the back and removes them from the front — First In, First Out, just like a line of people.', code: 'from collections import deque\nq = deque()\nq.append(1)\nq.append(2)\nq.popleft()  # removes 1' },
+    { id: 'ds3', cat: 'Data Structures', title: 'Linked List (concept)', explain: 'A linked list stores elements as nodes, where each node points to the next one. Unlike arrays, elements do not need to sit next to each other in memory.', code: 'struct Node {\n  int data;\n  struct Node* next;\n};' },
+    { id: 'ds4', cat: 'Data Structures', title: 'Time Complexity Basics', explain: 'Time complexity describes how the runtime of an algorithm grows as input size grows. O(1) is constant, O(n) is linear, O(n\u00b2) is quadratic — smaller is generally better.', code: '// O(n): one loop through n items\nfor (int i = 0; i < n; i++) { ... }' },
+    { id: 'git1', cat: 'Git & GitHub', title: 'Git Basics', explain: 'Git tracks changes to your code over time so you can save versions and undo mistakes. A "commit" is a saved snapshot of your project.', code: 'git init\ngit add .\ngit commit -m "first commit"' },
+    { id: 'git2', cat: 'Git & GitHub', title: 'Pushing to GitHub', explain: 'GitHub hosts your Git repository online so you can back it up and share it. "Push" uploads your local commits to that remote repository.', code: 'git remote add origin <repo-url>\ngit push -u origin main' },
+    { id: 'git3', cat: 'Git & GitHub', title: 'Branches', explain: 'A branch is a separate line of development. You can experiment or build a feature on a branch without affecting the main working code.', code: 'git branch feature-login\ngit checkout feature-login' }
+  ];
+
+  function loadLearn() {
+    try { const raw = localStorage.getItem(LEARN_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
+    return { done: [], openId: null };
+  }
+  function saveLearn() { localStorage.setItem(LEARN_KEY, JSON.stringify(learnState)); }
+
+  function renderChips() {
+    const cats = ['All', ...new Set(topics.map(t => t.cat))];
+    document.getElementById('cat-chips').innerHTML = cats.map(c => `<div class="chip ${c===currentCategory?'active':''}" onclick="setCategory('${c}')">${c}</div>`).join('');
+  }
+  function setCategory(c) { currentCategory = c; renderChips(); renderTopics(); }
+
+  function toggleTopic(id) { learnState.openId = (learnState.openId === id) ? null : id; saveLearn(); renderTopics(); }
+
+  function markDone(id, event) {
+    event.stopPropagation();
+    const idx = learnState.done.indexOf(id);
+    if (idx >= 0) learnState.done.splice(idx, 1); else learnState.done.push(id);
+    saveLearn(); renderTopics(); renderLearnHero();
+  }
+
+  function speakTopic(id, event) {
+    event.stopPropagation();
+    const t = topics.find(x => x.id === id);
+    if (!t) return;
+    if (!('speechSynthesis' in window)) { showToast("Voice isn't supported on this browser."); return; }
+    if (speechSynthesis.speaking) { speechSynthesis.cancel(); renderTopics(); return; }
+    const utter = new SpeechSynthesisUtterance(t.title + '. ' + t.explain);
+    utter.rate = 0.95;
+    utter.onend = () => { renderTopics(); };
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
+    renderTopics();
+  }
+
+  function renderTopics() {
+    const list = currentCategory === 'All' ? topics : topics.filter(t => t.cat === currentCategory);
+    const el = document.getElementById('topics-list');
+    const speaking = ('speechSynthesis' in window) && speechSynthesis.speaking;
+    el.innerHTML = list.map(t => {
+      const isOpen = learnState.openId === t.id;
+      const isDone = learnState.done.includes(t.id);
+      return `
+        <div class="topic-card ${isOpen?'open':''}" onclick="toggleTopic('${t.id}')">
+          <div class="topic-head">
+            <div class="topic-title-wrap">
+              <div class="topic-check ${isDone?'done':''}">${isDone?'✓':''}</div>
+              <div><div class="topic-cat-label">${t.cat}</div><div class="topic-title">${t.title}</div></div>
+            </div>
+            <div class="chevron">▾</div>
+          </div>
+          <div class="topic-body">
+            <div class="topic-body-inner">
+              <div class="topic-explain">${t.explain}</div>
+              ${t.code ? `<div class="topic-code">${t.code.replace(/</g,'&lt;')}</div>` : ''}
+              <div class="topic-actions">
+                <button class="listen-btn ${speaking ? 'speaking' : ''}" onclick="speakTopic('${t.id}', event)">${speaking ? '⏸ Stop' : '🔊 Listen'}</button>
+                <button class="mark-btn ${isDone?'done':''}" onclick="markDone('${t.id}', event)">${isDone ? '✓ Learned' : 'Mark as learned'}</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderLearnHero() {
+    const total = topics.length, done = learnState.done.length;
+    const pct = total ? Math.round((done/total)*100) : 0;
+    document.getElementById('learn-progress-text').textContent = `${done} of ${total} topics learned`;
+    document.getElementById('ring-pct').textContent = pct + '%';
+    const circumference = 138;
+    document.getElementById('ring-progress').style.strokeDashoffset = circumference - (circumference * pct / 100);
+  }
+
+  /* ================= PAGE NAV ================= */
+  function switchPage(page) {
+    currentPage = page;
+    ['track','learn','stats'].forEach(p => {
+      document.getElementById('page-' + p).classList.toggle('active', p === page);
+      document.getElementById('nav-' + p).classList.toggle('active', p === page);
+    });
+    const titles = { track: ['Commute Tracker','Bus · Home · College'], learn: ['Bus-time Learning','Coding basics for your commute'], stats: ['Your Stats','Patterns across the week'] };
+    document.getElementById('page-title').textContent = titles[page][0];
+    document.getElementById('page-subtitle').textContent = titles[page][1];
+    if (page === 'stats') updateChart();
+  }
+
+  function showToast(text, actionLabel, actionFn) {
+    const t = document.getElementById('toast');
+    document.getElementById('toast-text').innerHTML = text + (actionLabel ? ` <button onclick="${actionFn}">${actionLabel}</button>` : '');
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 4500);
+  }
+
+  /* ================= TRACKER ================= */
+  function todayKey(offsetDays = 0) {
+    const d = new Date(); d.setDate(d.getDate() - offsetDays);
+    return d.getFullYear() + '-' + (d.getMonth()+1).toString().padStart(2,'0') + '-' + d.getDate().toString().padStart(2,'0');
+  }
+  function loadData() {
+    try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
+    return { days: {}, current: null };
+  }
+  function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+  function ensureDay(key) {
+    if (!data.days[key]) data.days[key] = { bus: 0, home: 0, college: 0, log: [] };
+    return data.days[key];
+  }
+  const labels = { bus: '🚌 Bus', home: '🏠 Home', college: '🎓 College' };
+  const colors = { bus: '#ff7a45', home: '#12b886', college: '#5b3df5' };
+
+  function setState(newState) {
+    const now = Date.now();
+    const today = ensureDay(todayKey());
+    if (data.current) {
+      const elapsedMin = (now - data.current.startTime) / 60000;
+      today[data.current.state] += elapsedMin;
+      today.log.push({ state: data.current.state, start: data.current.startTime, end: now });
+    }
+    data.current = { state: newState, startTime: now };
+    saveData();
+    render();
+    if (newState === 'bus') showToast('📚 On the bus? Good time to learn something.', 'Open Learn', "switchPage('learn')");
+    updateSpeedoVisibility();
+  }
+
+  function resetToday() {
+    if (!confirm("Reset all of today's tracked time? This cannot be undone.")) return;
+    delete data.days[todayKey()];
+    data.current = null;
+    saveData(); render();
+  }
+
+  function fmtDuration(minutes) { const t = Math.round(minutes); return `${Math.floor(t/60)}h ${t%60}m`; }
+  function fmtClock(ts) {
+    const d = new Date(ts); let h = d.getHours(); const m = d.getMinutes().toString().padStart(2,'0');
+    const ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12; if (h === 0) h = 12;
+    return `${h}:${m} ${ampm}`;
+  }
+  function getLiveToday() {
+    const today = ensureDay(todayKey());
+    const live = { bus: today.bus, home: today.home, college: today.college };
+    if (data.current) live[data.current.state] += (Date.now() - data.current.startTime) / 60000;
+    return live;
+  }
+
+  function switchChartView(view) {
+    currentChartView = view;
+    document.getElementById('tab-today').classList.toggle('active', view === 'today');
+    document.getElementById('tab-week').classList.toggle('active', view === 'week');
+    updateChart();
+  }
+
+  function updateChart() {
+    if (currentChartView === 'today') {
+      const live = getLiveToday();
+      renderChart({ type: 'doughnut', data: { labels: ['Bus','Home','College'], datasets: [{ data: [live.bus, live.home, live.college], backgroundColor: [colors.bus, colors.home, colors.college], borderWidth: 0, borderRadius: 8, spacing: 3, hoverOffset: 10 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '68%', animation: { animateRotate: true, animateScale: true, duration: 900, easing: 'easeOutCubic' },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.label}: ${fmtDuration(c.parsed)}` } } } } });
+    } else {
+      const dayLabels = [], busArr = [], homeArr = [], collegeArr = [];
+      for (let i = 6; i >= 0; i--) {
+        const key = todayKey(i); const d = new Date(key);
+        dayLabels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+        const day = data.days[key] || { bus: 0, home: 0, college: 0 };
+        let bus = day.bus, home = day.home, college = day.college;
+        if (i === 0 && data.current) {
+          const extra = (Date.now() - data.current.startTime) / 60000;
+          if (data.current.state === 'bus') bus += extra;
+          if (data.current.state === 'home') home += extra;
+          if (data.current.state === 'college') college += extra;
+        }
+        busArr.push(+(bus/60).toFixed(2)); homeArr.push(+(home/60).toFixed(2)); collegeArr.push(+(college/60).toFixed(2));
+      }
+      renderChart({ type: 'bar', data: { labels: dayLabels, datasets: [
+          { label: 'Bus', data: busArr, backgroundColor: colors.bus, borderRadius: 5, stack: 's' },
+          { label: 'Home', data: homeArr, backgroundColor: colors.home, borderRadius: 5, stack: 's' },
+          { label: 'College', data: collegeArr, backgroundColor: colors.college, borderRadius: 5, stack: 's' } ] },
+        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 800, easing: 'easeOutQuart' },
+          scales: { x: { stacked: true, grid: { display:false }, ticks: { font: { size: 11 } } }, y: { stacked: true, grid: { color: '#f0edfa' }, ticks: { font: { size: 11 }, callback: (v) => v + 'h' } } },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y.toFixed(1)}h` } } } } });
+    }
+  }
+  function renderChart(cfg) { if (chart) chart.destroy(); chart = new Chart(document.getElementById('mainChart'), cfg); }
+
+  function render() {
+    const today = ensureDay(todayKey());
+    const live = getLiveToday();
+    if (data.current) {
+      document.getElementById('current-state').innerHTML = `<span class="pulse-dot"></span>${labels[data.current.state]}`;
+      const elapsedSec = Math.floor((Date.now() - data.current.startTime) / 1000);
+      const h = Math.floor(elapsedSec/3600), m = Math.floor((elapsedSec%3600)/60), s = elapsedSec%60;
+      document.getElementById('current-timer').textContent = `Running: ${h}h ${m}m ${s}s`;
+    } else {
+      document.getElementById('current-state').textContent = 'Not started';
+      document.getElementById('current-timer').textContent = 'Tap a button below to start';
+    }
+    ['bus','home','college'].forEach(s => { document.getElementById('btn-' + s).disabled = (data.current && data.current.state === s); });
+    document.getElementById('sum-bus').textContent = fmtDuration(live.bus);
+    document.getElementById('sum-home').textContent = fmtDuration(live.home);
+    document.getElementById('sum-college').textContent = fmtDuration(live.college);
+
+    const historyList = document.getElementById('history-list');
+    if (today.log.length === 0 && !data.current) {
+      historyList.innerHTML = '<div class="history-empty">No entries yet today</div>';
+    } else {
+      let html = '';
+      today.log.slice().reverse().forEach(entry => { html += `<div class="history-item"><span>${labels[entry.state]}</span><span>${fmtClock(entry.start)} → ${fmtClock(entry.end)}</span></div>`; });
+      if (data.current) html = `<div class="history-item"><span>${labels[data.current.state]}</span><span>${fmtClock(data.current.startTime)} → now</span></div>` + html;
+      historyList.innerHTML = html;
+    }
+  }
+
+  /* ================= SPEEDOMETER ================= */
+  let geoWatchId = null, gpsOn = false, lastPos = null, speedSamples = [], maxSpeed = 0, totalDistKm = 0;
+  const MAX_GAUGE_SPEED = 100;
+
+  function updateSpeedoVisibility() {
+    const card = document.getElementById('speedo-card');
+    const showIt = data.current && data.current.state === 'bus';
+    card.style.display = showIt ? 'block' : 'none';
+    if (!showIt && gpsOn) toggleGPS();
+  }
+
+  function toggleGPS() {
+    if (gpsOn) {
+      if (geoWatchId !== null) navigator.geolocation.clearWatch(geoWatchId);
+      geoWatchId = null; gpsOn = false; lastPos = null;
+      document.getElementById('gps-status').textContent = 'GPS off';
+      document.getElementById('gps-status').className = 'gps-status off';
+      document.getElementById('gps-toggle-btn').textContent = 'Enable GPS Speed';
+      setGaugeSpeed(0);
+      return;
+    }
+    if (!('geolocation' in navigator)) { showToast("Location isn't available on this device/browser."); return; }
+    geoWatchId = navigator.geolocation.watchPosition(onGeoUpdate, () => { showToast('Location permission denied or unavailable.'); if (gpsOn) toggleGPS(); }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 8000 });
+    gpsOn = true; speedSamples = []; maxSpeed = 0; totalDistKm = 0;
+    document.getElementById('gps-status').textContent = 'GPS on';
+    document.getElementById('gps-status').className = 'gps-status on';
+    document.getElementById('gps-toggle-btn').textContent = 'Stop GPS Speed';
+    document.getElementById('speedo-avg').textContent = '0';
+    document.getElementById('speedo-max').textContent = '0';
+    document.getElementById('speedo-dist').textContent = '0.0';
+  }
+
+  function haversineKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function onGeoUpdate(pos) {
+    const now = Date.now();
+    let speedKmh = 0;
+    if (pos.coords.speed !== null && pos.coords.speed !== undefined && pos.coords.speed >= 0) {
+      speedKmh = pos.coords.speed * 3.6;
+    } else if (lastPos) {
+      const distKm = haversineKm(lastPos.lat, lastPos.lon, pos.coords.latitude, pos.coords.longitude);
+      const hours = (now - lastPos.time) / 3600000;
+      speedKmh = hours > 0 ? distKm / hours : 0;
+    }
+    if (lastPos) totalDistKm += haversineKm(lastPos.lat, lastPos.lon, pos.coords.latitude, pos.coords.longitude);
+    lastPos = { lat: pos.coords.latitude, lon: pos.coords.longitude, time: now };
+    speedKmh = Math.max(0, Math.min(speedKmh, 180));
+    speedSamples.push(speedKmh);
+    if (speedSamples.length > 200) speedSamples.shift();
+    if (speedKmh > maxSpeed) maxSpeed = speedKmh;
+    const avg = speedSamples.reduce((a,b) => a+b, 0) / speedSamples.length;
+    setGaugeSpeed(speedKmh);
+    document.getElementById('speedo-avg').textContent = Math.round(avg);
+    document.getElementById('speedo-max').textContent = Math.round(maxSpeed);
+    document.getElementById('speedo-dist').textContent = totalDistKm.toFixed(1);
+  }
+
+  function setGaugeSpeed(speedKmh) {
+    const pct = Math.max(0, Math.min(speedKmh / MAX_GAUGE_SPEED, 1));
+    document.getElementById('gauge-speed').textContent = Math.round(speedKmh);
+    const circumference = 298;
+    document.getElementById('gauge-arc').style.strokeDashoffset = circumference - (circumference * pct);
+    const angle = -90 + (pct * 180);
+    document.getElementById('gauge-needle').setAttribute('transform', `rotate(${angle} 110 115)`);
+  }
+
+  /* ================= AUTO-DETECT ================= */
+  const ENTER_RADIUS_KM = 0.15, EXIT_RADIUS_KM = 0.30, STABLE_READS_NEEDED = 2;
+  let autoWatchId = null, autoStableCandidate = null, autoStableCount = 0;
+
+  function loadAuto() {
+    try { const raw = localStorage.getItem(AUTO_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
+    return { enabled: false, home: null, college: null };
+  }
+  function saveAuto() { localStorage.setItem(AUTO_KEY, JSON.stringify(autoData)); }
+
+  function renderAutoUI() {
+    document.getElementById('auto-toggle').checked = autoData.enabled;
+    const homeStatus = document.getElementById('home-loc-status');
+    const collegeStatus = document.getElementById('college-loc-status');
+    homeStatus.textContent = autoData.home ? 'Saved ✓' : 'Not set';
+    homeStatus.className = 'auto-loc-status' + (autoData.home ? ' set' : '');
+    collegeStatus.textContent = autoData.college ? 'Saved ✓' : 'Not set';
+    collegeStatus.className = 'auto-loc-status' + (autoData.college ? ' set' : '');
+    const banner = document.getElementById('auto-status-banner');
+    if (autoData.enabled) {
+      banner.className = 'auto-status-banner active';
+      banner.textContent = (autoData.home && autoData.college) ? 'Auto-detect is on — keep this tab open while traveling.' : 'Auto-detect is on, but set both locations for it to fully work.';
+    } else {
+      banner.className = 'auto-status-banner inactive';
+      banner.textContent = 'Auto-detect is off — keep this app open in your browser while traveling for it to work.';
+    }
+  }
+
+  function saveAutoLocation(which) {
+    if (!('geolocation' in navigator)) { showToast("Location isn't available on this device/browser."); return; }
+    showToast('Getting your current location…');
+    navigator.geolocation.getCurrentPosition((pos) => {
+      autoData[which] = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      saveAuto(); renderAutoUI();
+      showToast((which === 'home' ? '🏠 Home' : '🎓 College') + ' location saved.');
+    }, () => showToast('Could not get your location — check permission is allowed.'), { enableHighAccuracy: true, timeout: 10000 });
+  }
+
+  function toggleAutoDetect(enabled) {
+    autoData.enabled = enabled; saveAuto(); renderAutoUI();
+    if (enabled) startAutoWatch(); else stopAutoWatch();
+  }
+
+  function startAutoWatch() {
+    if (!('geolocation' in navigator)) { showToast("Location isn't available on this device/browser."); return; }
+    if (autoWatchId !== null) return;
+    autoStableCandidate = null; autoStableCount = 0;
+    autoWatchId = navigator.geolocation.watchPosition(onAutoPosition, () => showToast('Auto-detect: location signal lost.'), { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+  }
+  function stopAutoWatch() { if (autoWatchId !== null) { navigator.geolocation.clearWatch(autoWatchId); autoWatchId = null; } }
+
+  function onAutoPosition(pos) {
+    if (!autoData.home || !autoData.college) return;
+    const lat = pos.coords.latitude, lon = pos.coords.longitude;
+    const distHome = haversineKm(lat, lon, autoData.home.lat, autoData.home.lon);
+    const distCollege = haversineKm(lat, lon, autoData.college.lat, autoData.college.lon);
+    const currentState = data.current ? data.current.state : null;
+    let candidate;
+    if (currentState === 'home') candidate = (distHome <= EXIT_RADIUS_KM) ? 'home' : (distCollege <= ENTER_RADIUS_KM ? 'college' : 'bus');
+    else if (currentState === 'college') candidate = (distCollege <= EXIT_RADIUS_KM) ? 'college' : (distHome <= ENTER_RADIUS_KM ? 'home' : 'bus');
+    else { if (distHome <= ENTER_RADIUS_KM) candidate = 'home'; else if (distCollege <= ENTER_RADIUS_KM) candidate = 'college'; else candidate = 'bus'; }
+
+    if (candidate === autoStableCandidate) autoStableCount++;
+    else { autoStableCandidate = candidate; autoStableCount = 1; }
+
+    if (autoStableCount >= STABLE_READS_NEEDED && candidate !== currentState) {
+      setState(candidate);
+      showToast('📍 Auto-detected: switched to ' + labels[candidate]);
+      autoStableCount = 0;
+    }
+  }
+
+  /* ================= INIT ================= */
+  let tickCounter = 0;
+  setInterval(() => {
+    render();
+    tickCounter++;
+    if (tickCounter % 5 === 0 && currentPage === 'stats') updateChart();
+  }, 1000);
+
+  render();
+  renderChips();
+  renderTopics();
+  renderLearnHero();
+  updateSpeedoVisibility();
+  renderAutoUI();
+  if (autoData.enabled) startAutoWatch();
+  initOnboarding();
+
+  /* ================= AUTO-TRIGGER VIA URL (for MacroDroid/Tasker) ================= */
+  // Opening this page with ?state=college / ?state=home / ?state=bus
+  // instantly sets that state, so a geofencing app can trigger it in the background
+  // even when this app itself isn't open.
+  (function checkUrlTrigger() {
+    const params = new URLSearchParams(window.location.search);
+    const triggerState = params.get('state');
+    if (triggerState && ['bus','home','college'].includes(triggerState)) {
+      setState(triggerState);
+      showToast('📍 Auto-set to ' + labels[triggerState] + ' (via automation)');
+      // clean the URL so re-opening the app later doesn't re-trigger the same state
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  })();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
